@@ -8,6 +8,8 @@ export default function Home() {
   const [currentWord, setCurrentWord] = useState('');
   const [typedChars, setTypedChars] = useState('');
   const [wordIndex, setWordIndex] = useState(0);
+  const [correctCount, setCorrectCount] = useState(0);
+  const [missCount, setMissCount] = useState(0);
 
   useEffect(() => {
     setCurrentWord(words[wordIndex]);
@@ -32,7 +34,9 @@ export default function Home() {
 
         if (nextChar === key) {
           const newTypedChars = typedChars + key;
+          const totalTrueTyping = correctCount + 1;
           setTypedChars(newTypedChars);
+          setCorrectCount(totalTrueTyping);
 
           if (newTypedChars.length === currentWord.length) {
             const nextIndex = wordIndex + 1;
@@ -46,6 +50,9 @@ export default function Home() {
             }
           }
         }
+      } else {
+        const totalMissTyping = missCount + 1;
+        setMissCount(totalMissTyping);
       }
     };
 
@@ -61,6 +68,8 @@ export default function Home() {
     <div className={styles.container}>
       <h1>タイピングゲーム</h1>
       <div className={styles.gameArea}>
+        <p>スコア：{correctCount}</p>
+        <p>ミス：{missCount}</p>
         <p className={styles.wordDisplay}>
           <span className={styles.correctChars}>{typedChars}</span>
           <span className={styles.remainingChars}>{currentWord.substring(typedChars.length)}</span>
