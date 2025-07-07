@@ -53,7 +53,7 @@ export default function Home() {
     return () => {
       window.removeEventListener('keydown', handleKeyDown);
     };
-  }, [currentWord, typedChars]);
+  }, [currentWord, typedChars, wordIndex]);
 
   const isWordTyped = typedChars.length === currentWord.length && currentWord.length > 0;
 
