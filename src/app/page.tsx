@@ -49,10 +49,10 @@ export default function Home() {
               setTypedChars('');
             }
           }
+        } else {
+          const totalMissTyping = missCount + 1;
+          setMissCount(totalMissTyping);
         }
-      } else {
-        const totalMissTyping = missCount + 1;
-        setMissCount(totalMissTyping);
       }
     };
 
@@ -62,7 +62,7 @@ export default function Home() {
     };
   }, [currentWord, typedChars, wordIndex, correctCount, missCount]);
 
-  const isWordTyped = typedChars.length === currentWord.length && currentWord.length > 0;
+  // const isWordTyped = typedChars.length === currentWord.length && currentWord.length > 0;
 
   return (
     <div className={styles.container}>
