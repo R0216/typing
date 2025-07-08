@@ -3,20 +3,24 @@
 import { useEffect, useState } from 'react';
 import styles from './page.module.css';
 
-const words: string[] = ['hello', 'world', 'typescript', 'programming', 'game'];
+const words = ['hello', 'world', 'typescript', 'programming', 'game'];
 export default function Home() {
   const [currentWord, setCurrentWord] = useState('');
   const [typedChars, setTypedChars] = useState('');
   const [wordIndex, setWordIndex] = useState(0);
   const [correctCount, setCorrectCount] = useState(0);
   const [missCount, setMissCount] = useState(0);
+  const [gamePhase, setGamePhase] = useState<'idle' | 'playing' | 'finished'>('idle');
 
   useEffect(() => {
-    setCurrentWord(words[wordIndex]);
-  }, [wordIndex]);
+    if (gamePhase === 'playing') {
+      setCurrentWord(words[wordIndex]);
+    }
+  }, [wordIndex, gamePhase]);
 
   useEffect(() => {
     const handleKeyDown = (event: KeyboardEvent) => {
+      if (gamePhase !== 'playing' || !currentWord) return;
       const { key } = event;
       if (key === 'Enter') {
         event.preventDefault();
@@ -45,6 +49,7 @@ export default function Home() {
               setTypedChars('');
             } else {
               console.log('すべての単語を打ち終えた');
+              setGamePhase('finished');
               setCurrentWord('');
               setTypedChars('');
             }
@@ -60,20 +65,53 @@ export default function Home() {
     return () => {
       window.removeEventListener('keydown', handleKeyDown);
     };
-  }, [currentWord, typedChars, wordIndex, correctCount, missCount]);
+  }, [currentWord, typedChars, wordIndex, correctCount, missCount, gamePhase]);
 
+  const gameStart = () => {
+    setGamePhase('playing');
+    setWordIndex(0);
+    setTypedChars('');
+    setCorrectCount(0);
+    setMissCount(0);
+  };
+  const resetGame = () => {
+    gameStart();
+  };
   // const isWordTyped = typedChars.length === currentWord.length && currentWord.length > 0;
 
   return (
     <div className={styles.container}>
       <h1>タイピングゲーム</h1>
       <div className={styles.gameArea}>
-        <p>スコア：{correctCount}</p>
-        <p>ミス：{missCount}</p>
-        <p className={styles.wordDisplay}>
-          <span className={styles.correctChars}>{typedChars}</span>
-          <span className={styles.remainingChars}>{currentWord.substring(typedChars.length)}</span>
-        </p>
+        {gamePhase === 'idle' && (
+          <div>
+            <button onClick={gameStart} className={styles.startButton}>
+              ゲーム開始
+            </button>
+          </div>
+        )}
+        {gamePhase === 'playing' && (
+          <>
+            <p>スコア：{correctCount}</p>
+            <p>ミス：{missCount}</p>
+            <p className={styles.wordDisplay}>
+              <span className={styles.correctChars}>{typedChars}</span>
+              <span className={styles.remainingChars}>
+                {currentWord.substring(typedChars.length)}
+              </span>
+            </p>
+          </>
+        )}
+        {gamePhase === 'finished' && (
+          <div>
+            <h2>ゲーム終了</h2>
+            <p>最終スコア：{correctCount}</p>
+            <p>ミス数：{missCount}</p>
+            <button onClick={resetGame} className={styles.resetButton}>
+              もう一度プレイ
+            </button>
+          </div>
+        )}
       </div>
       {/* 今後、入力受付のロジックや、スコア、タイマーなどをここに追加していきます */}
     </div>
