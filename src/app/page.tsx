@@ -11,6 +11,9 @@ export default function Home() {
   const [correctCount, setCorrectCount] = useState(0);
   const [missCount, setMissCount] = useState(0);
   const [gamePhase, setGamePhase] = useState<'idle' | 'playing' | 'finished'>('idle');
+  const [timeLeft, setTimeLeft] = useState(60);
+  const [finalCpm, setFinalCpm] = useState(0);
+  const [finalWpm, setFinalWpm] = useState(0);
 
   useEffect(() => {
     if (gamePhase === 'playing') {
@@ -19,25 +22,42 @@ export default function Home() {
   }, [wordIndex, gamePhase]);
 
   useEffect(() => {
+    if (gamePhase === 'finished') {
+      const initialTime = 60;
+      const gameDuration = initialTime - timeLeft;
+      const effectiveGameDuration = gameDuration > 0 ? gameDuration : 1;
+      const calculatedCpm = Math.round((correctCount / effectiveGameDuration) * 60);
+      const calculatedWpm = Math.round(calculatedCpm / 5);
+
+      setFinalCpm(calculatedCpm);
+      setFinalWpm(calculatedWpm);
+    }
+  }, [gamePhase, correctCount, timeLeft]);
+  useEffect(() => {
     const handleKeyDown = (event: KeyboardEvent) => {
+      if (gamePhase === 'idle' && event.key === ' ') {
+        event.preventDefault();
+        gameStart();
+        return;
+      }
       if (gamePhase !== 'playing' || !currentWord) return;
-      const { key } = event;
-      if (key === 'Enter') {
+
+      if (event.key === 'Enter') {
         event.preventDefault();
         return;
       }
 
-      if (key === 'Backapace') {
+      if (event.key === 'Backspace') {
         setTypedChars((prev) => prev.slice(0, -1));
         event.preventDefault();
         return;
       }
 
-      if (key.length === 1) {
+      if (event.key.length === 1) {
         const nextChar = currentWord[typedChars.length];
 
-        if (nextChar === key) {
-          const newTypedChars = typedChars + key;
+        if (nextChar === event.key) {
+          const newTypedChars = typedChars + event.key;
           const totalTrueTyping = correctCount + 1;
           setTypedChars(newTypedChars);
           setCorrectCount(totalTrueTyping);
@@ -67,12 +87,34 @@ export default function Home() {
     };
   }, [currentWord, typedChars, wordIndex, correctCount, missCount, gamePhase]);
 
+  useEffect(() => {
+    let timer: NodeJS.Timeout | null = null;
+    if (gamePhase === 'playing' && timeLeft > 0) {
+      timer = setInterval(() => {
+        setTimeLeft((pervTime) => pervTime - 1);
+      }, 1000);
+    } else if (timeLeft === 0 && gamePhase === 'playing') {
+      setGamePhase('finished');
+      setCurrentWord('');
+      setTypedChars('');
+    }
+
+    return () => {
+      if (timer) {
+        clearInterval(timer);
+      }
+    };
+  }, [gamePhase, timeLeft]);
+
   const gameStart = () => {
     setGamePhase('playing');
     setWordIndex(0);
     setTypedChars('');
     setCorrectCount(0);
     setMissCount(0);
+    setTimeLeft(60);
+    setFinalCpm(0);
+    setFinalWpm(0);
   };
   const resetGame = () => {
     gameStart();
@@ -85,6 +127,7 @@ export default function Home() {
       <div className={styles.gameArea}>
         {gamePhase === 'idle' && (
           <div>
+            <p>「ゲーム開始」をクリックか**スペースキー**で開始</p>
             <button onClick={gameStart} className={styles.startButton}>
               ゲーム開始
             </button>
@@ -92,6 +135,7 @@ export default function Home() {
         )}
         {gamePhase === 'playing' && (
           <>
+            <p>残り時間：{timeLeft}秒</p>
             <p>スコア：{correctCount}</p>
             <p>ミス：{missCount}</p>
             <p className={styles.wordDisplay}>
@@ -105,8 +149,16 @@ export default function Home() {
         {gamePhase === 'finished' && (
           <div>
             <h2>ゲーム終了</h2>
+            {timeLeft === 0 && <p>時間切れです！</p>}
+            {wordIndex === words.length && <p>すべての単語を打ち終えました！</p>}
             <p>最終スコア：{correctCount}</p>
             <p>ミス数：{missCount}</p>
+            <p>
+              <strong>CPM: {finalCpm}</strong>
+            </p>
+            <p>
+              <strong>CPM: {finalWpm}</strong>
+            </p>
             <button onClick={resetGame} className={styles.resetButton}>
               もう一度プレイ
             </button>
