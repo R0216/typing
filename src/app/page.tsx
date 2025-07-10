@@ -4,6 +4,35 @@ import { useEffect, useState } from 'react';
 import styles from './page.module.css';
 
 const words = ['hello', 'world', 'typescript', 'programming', 'game'];
+
+function shuffleArray<T>(array: T[]): T[] {
+  const newArray = [...array];
+  for (let i = newArray.length - 1; i > 0; i--) {
+    const j = Math.floor(Math.random() * (i + 1));
+    [newArray[i], newArray[j]] = [newArray[j], newArray[i]];
+  }
+  return newArray;
+}
+
+async function fetchRandomWord(numberToFetch: number): Promise<string[] | null> {
+  try {
+    const response = await fetch(
+      `https://random-word-api.herokuapp.com/word?number=${numberToFetch}`,
+    );
+    if (!response.ok) {
+      throw new Error(`HTTP error! status: ${response.status}`);
+    }
+    const data: string[] = (await response.json()) as string[];
+    if (data && data.length > 0) {
+      return data;
+    }
+    return null;
+  } catch (error) {
+    console.error('Failed to fetch word:', error);
+    return null;
+  }
+}
+
 export default function Home() {
   const [currentWord, setCurrentWord] = useState('');
   const [typedChars, setTypedChars] = useState('');
@@ -14,12 +43,35 @@ export default function Home() {
   const [timeLeft, setTimeLeft] = useState(60);
   const [finalCpm, setFinalCpm] = useState(0);
   const [finalWpm, setFinalWpm] = useState(0);
+  const [isLoadingWord, setIsLoadingWord] = useState<boolean>(false);
+  const [fetchError, setFetchError] = useState<string | null>(null);
+  const [shuffuledWords, setShuffuledWords] = useState<string[]>([]);
 
   useEffect(() => {
-    if (gamePhase === 'playing') {
-      setCurrentWord(words[wordIndex]);
+    if (gamePhase === 'playing' && shuffuledWords.length > 0) {
+      setCurrentWord(shuffuledWords[wordIndex]);
+      setTypedChars('');
     }
-  }, [wordIndex, gamePhase]);
+  }, [wordIndex, gamePhase, shuffuledWords]);
+
+  useEffect(() => {
+    let timer: NodeJS.Timeout | null = null;
+    if (gamePhase === 'playing' && timeLeft > 0) {
+      timer = setInterval(() => {
+        setTimeLeft((pervTime) => pervTime - 1);
+      }, 1000);
+    } else if (timeLeft === 0 && gamePhase === 'playing') {
+      setGamePhase('finished');
+      setCurrentWord('');
+      setTypedChars('');
+    }
+
+    return () => {
+      if (timer) {
+        clearInterval(timer);
+      }
+    };
+  }, [gamePhase, timeLeft]);
 
   useEffect(() => {
     if (gamePhase === 'finished') {
@@ -33,11 +85,19 @@ export default function Home() {
       setFinalWpm(calculatedWpm);
     }
   }, [gamePhase, correctCount, timeLeft]);
+
   useEffect(() => {
     const handleKeyDown = (event: KeyboardEvent) => {
       if (gamePhase === 'idle' && event.key === ' ') {
         event.preventDefault();
-        gameStart();
+        (async () => {
+          await gameStart();
+        })().catch((error) => {
+          console.error('Error starting game via spacebar:', error);
+          setFetchError('ゲーム開始時にエラーが発生しました。');
+          // エラー時も isLoadingWord を false にする
+          setIsLoadingWord(false);
+        });
         return;
       }
       if (gamePhase !== 'playing' || !currentWord) return;
@@ -87,26 +147,7 @@ export default function Home() {
     };
   }, [currentWord, typedChars, wordIndex, correctCount, missCount, gamePhase]);
 
-  useEffect(() => {
-    let timer: NodeJS.Timeout | null = null;
-    if (gamePhase === 'playing' && timeLeft > 0) {
-      timer = setInterval(() => {
-        setTimeLeft((pervTime) => pervTime - 1);
-      }, 1000);
-    } else if (timeLeft === 0 && gamePhase === 'playing') {
-      setGamePhase('finished');
-      setCurrentWord('');
-      setTypedChars('');
-    }
-
-    return () => {
-      if (timer) {
-        clearInterval(timer);
-      }
-    };
-  }, [gamePhase, timeLeft]);
-
-  const gameStart = () => {
+  const gameStart = async () => {
     setGamePhase('playing');
     setWordIndex(0);
     setTypedChars('');
@@ -115,11 +156,30 @@ export default function Home() {
     setTimeLeft(60);
     setFinalCpm(0);
     setFinalWpm(0);
+    setFetchError(null);
+    setIsLoadingWord(true);
+
+    try {
+      const fetchedWords = await fetchRandomWord(20);
+      if (fetchedWords && fetchedWords.length > 0) {
+        setShuffuledWords(shuffleArray(fetchedWords));
+      } else {
+        const fallbackWords = shuffleArray(words.map((word) => word.toLowerCase()));
+        setShuffuledWords(fallbackWords);
+        setFetchError('Failed to fetch a random word. Using a fallback word.');
+      }
+    } catch (error) {
+      console.error('Error loading new word:', error);
+      const fallbackWords = shuffleArray(words.map((word) => word.toLowerCase()));
+      setShuffuledWords(fallbackWords);
+      setFetchError('Failed to load word. Check your network or try again.');
+    } finally {
+      setIsLoadingWord(false);
+    }
   };
-  const resetGame = () => {
-    gameStart();
+  const resetGame = async () => {
+    await gameStart();
   };
-  // const isWordTyped = typedChars.length === currentWord.length && currentWord.length > 0;
 
   return (
     <div className={styles.container}>
@@ -138,6 +198,18 @@ export default function Home() {
             <p>残り時間：{timeLeft}秒</p>
             <p>スコア：{correctCount}</p>
             <p>ミス：{missCount}</p>
+            {isLoadingWord ? (
+              <p className={styles.loadingMessage}>単語を読み込み中...</p>
+            ) : fetchError ? (
+              <p className={styles.errorMessage}>{fetchError}</p>
+            ) : (
+              <p className={styles.wordDisplay}>
+                <span className={styles.correctChars}>{typedChars}</span>
+                <span className={styles.remainingChars}>
+                  {currentWord.substring(typedChars.length)}
+                </span>
+              </p>
+            )}
             <p className={styles.wordDisplay}>
               <span className={styles.correctChars}>{typedChars}</span>
               <span className={styles.remainingChars}>
@@ -157,7 +229,7 @@ export default function Home() {
               <strong>CPM: {finalCpm}</strong>
             </p>
             <p>
-              <strong>CPM: {finalWpm}</strong>
+              <strong>WPM: {finalWpm}</strong>
             </p>
             <button onClick={resetGame} className={styles.resetButton}>
               もう一度プレイ
